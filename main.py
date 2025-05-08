@@ -33,6 +33,8 @@ if os.path.exists(PATH + MODEL_PERFORMANCE):
     test_accuracy = perfomance['test_accuracy']
     test_losses = perfomance['test_losses']
     test_counter = perfomance['test_counter']
+
+    test_confusion_matrix = perfomance['test_confusion_mtx']
 else:
     train_losses = []
     train_counter = []
@@ -41,6 +43,8 @@ else:
     test_accuracy = []
     test_losses = []
     test_counter = []
+
+    test_confusion_matrix = []
 
 net = NeuralNet(len(Dataset.TYPES_NAMES_TO_NUMBERS.keys()))
 print('Model')
@@ -81,7 +85,7 @@ def train(epoch):
         loss.backward()
         optimizer.step()
 
-        if batch_idx * training_batch_size % int(len(training_loader) / 10) == 0:
+        if (batch_idx * training_batch_size + training_batch_size) % int(len(training_dataset) / 10) == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * training_batch_size, len(training_dataset),
                        100 * batch_idx / len(training_loader), loss.item()))
@@ -93,7 +97,16 @@ def train(epoch):
     print('Train Accuracy {}%'.format(current_accuracy))
 
 
+def change_conf_mtx(mtx, labels, ouput):
+    for i in range(len(ouput)):
+        max_output = ouput[i].argmax()
+        mtx[labels[i]][max_output] += 1
+
+    return mtx
+
+
 def test(contr=False):
+    conf_mtx = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
     test_loss = 0
     correct_guesses = 0
     if contr:
@@ -103,6 +116,8 @@ def test(contr=False):
             images, labels = images.to(device), labels.to(device)
 
             output = net(images)
+
+            conf_mtx = change_conf_mtx(conf_mtx, labels, output)
 
             test_loss += loss_function(output, labels).item()
 
@@ -120,6 +135,8 @@ def test(contr=False):
 
         current_accuracy = float(correct_guesses) / float(len(test_dataset))
         test_accuracy.append(current_accuracy)
+
+        test_confusion_matrix.append(conf_mtx)
 
         print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
             test_loss, correct_guesses, len(test_dataset),
@@ -142,7 +159,8 @@ while epoch <= 100:
                 'train_accuracy': train_accuracy,
                 'test_accuracy': test_accuracy,
                 'test_losses': test_losses,
-                'test_counter': test_counter
+                'test_counter': test_counter,
+                'test_confusion_mtx': test_confusion_matrix
             },
             PATH + MODEL_PERFORMANCE
         )
