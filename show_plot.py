@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import myutils
 
 
-PATH = 'tests/test4/stats.json'
+PATH = 'tests/test{}/stats.json'
 
 
 perfomance = myutils.read_data(PATH)
@@ -15,8 +15,14 @@ test_accuracy = perfomance['test_accuracy']
 test_losses = perfomance['test_losses']
 test_counter = perfomance['test_counter']
 
+if 'test_confusion_mtx' in perfomance.keys():
+    test_confusion_matrix = perfomance['test_confusion_mtx']
+
 print('Total epochs: {}'.format(len(test_accuracy)))
 print('Max Accuracy is: {}%'.format(round(100 * max(test_accuracy), 2)))
+if 'test_confusion_mtx' in perfomance.keys():
+    for row in test_confusion_matrix[-1]:
+        print(row)
 
 fig = plt.figure()
 plt.plot(train_counter, train_losses, color='blue', zorder=1)
