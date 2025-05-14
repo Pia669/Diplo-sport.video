@@ -6,7 +6,7 @@ import torch.utils.data
 import Dataset
 
 
-FRAMES_STEP = 5
+FRAMES_STEP = 10
 
 
 class Block2D(nn.Module):
@@ -69,17 +69,15 @@ class NeuralNet(nn.Module):
         self.conv1 = nn.Conv3d(3, 64, kernel_size=3, stride=1, padding=0)
         self.bn1 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=0)
+        self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
 
         self.layer1 = Block3D(64, 128, stride=1)
         self.layer2 = Block3D(128, 128, stride=2)
-
         self.layer3 = Block3D(128, 256, stride=1)
         self.layer4 = Block3D(256, 256, stride=2)
 
-        self.layer5 = Block3D(256, 512, stride=1)
-        self.layer6 = Block3D(512, 512, stride=2)
-
+        self.layer5 = Block2D(256, 512, stride=1)
+        self.layer6 = Block2D(512, 512, stride=2)
         self.layer7 = Block2D(512, 1024, stride=1)
         self.layer8 = Block2D(1024, 1024, stride=2)
 
@@ -99,12 +97,12 @@ class NeuralNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = self.layer5(x)
-        x = self.layer6(x)
 
         batch_size, num_frames, c, h, w = x.size()
         x = x.view(batch_size, -1, h, w)
 
+        x = self.layer5(x)
+        x = self.layer6(x)
         x = self.layer7(x)
         x = self.layer8(x)
 

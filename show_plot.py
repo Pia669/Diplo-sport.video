@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import myutils
 
 
-PATH = 'tests/test{}/stats.json'
+PATH = 'tests/test5/stats.json'
 
 
 perfomance = myutils.read_data(PATH)

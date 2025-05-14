@@ -18,8 +18,8 @@ print('Datasets')
 training_dataset = VideoDataset('train.json')
 test_dataset = VideoDataset('test.json')
 
-training_batch_size = 6
-test_batch_size = 6
+training_batch_size = 4
+test_batch_size = 4
 
 training_loader = torch.utils.data.DataLoader(training_dataset, batch_size=training_batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=True)
@@ -29,21 +29,21 @@ if os.path.exists(PATH + MODEL_PERFORMANCE):
     train_losses = perfomance['train_losses']
     train_counter = perfomance['train_counter']
     train_accuracy = perfomance['train_accuracy']
+    train_confusion_matrix = perfomance['train_confusion_mtx']
 
     test_accuracy = perfomance['test_accuracy']
     test_losses = perfomance['test_losses']
     test_counter = perfomance['test_counter']
-
     test_confusion_matrix = perfomance['test_confusion_mtx']
 else:
     train_losses = []
     train_counter = []
     train_accuracy = []
+    train_confusion_matrix = []
 
     test_accuracy = []
     test_losses = []
     test_counter = []
-
     test_confusion_matrix = []
 
 net = NeuralNet(len(Dataset.TYPES_NAMES_TO_NUMBERS.keys()))
@@ -69,6 +69,7 @@ torch.manual_seed(random_seed)
 
 
 def train(epoch):
+    conf_mtx = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
     correct_guesses = 0
     for batch_idx, (images, labels) in enumerate(training_loader):
         images, labels = images.to(device), labels.to(device)
@@ -85,6 +86,8 @@ def train(epoch):
         loss.backward()
         optimizer.step()
 
+        conf_mtx = change_conf_mtx(conf_mtx, labels, output)
+
         if (batch_idx * training_batch_size + training_batch_size) % int(len(training_dataset) / 10) == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * training_batch_size, len(training_dataset),
@@ -94,7 +97,10 @@ def train(epoch):
 
     current_accuracy = float(correct_guesses) / float(len(training_dataset))
     train_accuracy.append(current_accuracy)
-    print('Train Accuracy {}%'.format(current_accuracy))
+    train_confusion_matrix.append(conf_mtx)
+    print('Train: Avg. loss: {:.4f}, Accuracy: {:.4f}%\n{}\n{}\n{}'.format(
+        sum(train_losses[len(train_losses)-10:])/10, current_accuracy * 100.,
+        conf_mtx[0], conf_mtx[1], conf_mtx[2]))
 
 
 def change_conf_mtx(mtx, labels, ouput):
@@ -105,30 +111,22 @@ def change_conf_mtx(mtx, labels, ouput):
     return mtx
 
 
-def test(contr=False):
+def test():
     conf_mtx = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
     test_loss = 0
     correct_guesses = 0
-    if contr:
-        i = 0
     with torch.no_grad():
         for images, labels in test_loader:
             images, labels = images.to(device), labels.to(device)
 
             output = net(images)
 
-            conf_mtx = change_conf_mtx(conf_mtx, labels, output)
-
             test_loss += loss_function(output, labels).item()
 
             guesses = torch.max(output, 1, keepdim=True)[1]
 
             correct_guesses += torch.eq(guesses, labels.data.view_as(guesses)).sum()
-
-            if contr:
-                if i % 10 == 0:
-                    print('test {} -> {}'.format(i, correct_guesses))
-                i += 1
+            conf_mtx = change_conf_mtx(conf_mtx, labels, output)
 
         test_loss /= len(test_dataset) / test_batch_size
         test_losses.append(test_loss)
@@ -138,9 +136,9 @@ def test(contr=False):
 
         test_confusion_matrix.append(conf_mtx)
 
-        print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n{}\n{}\n{}\n'.format(
             test_loss, correct_guesses, len(test_dataset),
-            100. * current_accuracy))
+            100. * current_accuracy, conf_mtx[0], conf_mtx[1], conf_mtx[2]))
 
 
 print("\nTraining began")
@@ -157,6 +155,7 @@ while epoch <= 100:
                 'train_losses': train_losses,
                 'train_counter': train_counter,
                 'train_accuracy': train_accuracy,
+                'train_confusion_mtx': train_confusion_matrix,
                 'test_accuracy': test_accuracy,
                 'test_losses': test_losses,
                 'test_counter': test_counter,
