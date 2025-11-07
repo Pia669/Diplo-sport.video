@@ -43,7 +43,7 @@ if __name__ == '__main__':
     print('NN')
 
     test_batch_size = 5
-    dataset = Dataset.VideoDataset('../../test.json')
+    dataset = Dataset.VideoDataset('../../../Datasets/indor/test.json')
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=test_batch_size, shuffle=False)
     print("dataset")
 

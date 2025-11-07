@@ -6,7 +6,7 @@ import torch.utils.data
 import Dataset
 
 
-FRAMES_STEP = 10
+FRAMES_STEP = 5
 
 
 class Block2D(nn.Module):
@@ -66,24 +66,28 @@ class Block3D(nn.Module):
 class NeuralNet(nn.Module):
     def __init__(self, num_classes):
         super(NeuralNet, self).__init__()
-        self.conv1 = nn.Conv3d(3, 64, kernel_size=3, stride=1, padding=0)
+        self.conv1 = nn.Conv3d(3, 64, kernel_size=3, stride=1, padding=0)   #18
         self.bn1 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
+        self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=0)     #8
 
-        self.layer1 = Block3D(64, 128, stride=1)
-        self.layer2 = Block3D(128, 128, stride=2)
-        self.layer3 = Block3D(128, 256, stride=1)
-        self.layer4 = Block3D(256, 256, stride=2)
-
-        self.layer5 = Block2D(256, 512, stride=1)
-        self.layer6 = Block2D(512, 512, stride=2)
-        self.layer7 = Block2D(512, 1024, stride=1)
-        self.layer8 = Block2D(1024, 1024, stride=2)
+        self.layer1 = self._make_layer(Block3D, 64, 128)        #4
+        self.layer2 = self._make_layer(Block3D, 128, 256)       #2
+        self.layer3 = self._make_layer(Block3D, 256, 512)       #1
+        self.layer4 = self._make_layer(Block2D, 512, 1024)
+        self.layer5 = self._make_layer(Block2D, 1024, 2048)
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc1 = nn.Linear(1024, 256)
+        self.fc1 = nn.Linear(2048, 256)
         self.fc2 = nn.Linear(256, num_classes)
+
+    def _make_layer(self, block, in_channels, out_channels):
+        return nn.Sequential(
+            block(in_channels, in_channels, stride=1),
+            block(in_channels, out_channels, stride=1),
+            block(out_channels, out_channels, stride=1),
+            block(out_channels, out_channels, stride=2)
+        )
 
     def forward(self, x):
         x = torch.swapaxes(x, 1, 2)
@@ -96,15 +100,12 @@ class NeuralNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        x = self.layer4(x)
 
         batch_size, num_frames, c, h, w = x.size()
         x = x.view(batch_size, -1, h, w)
 
+        x = self.layer4(x)
         x = self.layer5(x)
-        x = self.layer6(x)
-        x = self.layer7(x)
-        x = self.layer8(x)
 
         x = self.avgpool(x)
         x = x.view(batch_size, -1)
