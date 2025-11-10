@@ -2,6 +2,9 @@ import os
 
 import torch
 import torch.nn as nn
+from torch.optim.lr_scheduler import StepLR
+
+torch.cuda.empty_cache()
 
 import Dataset
 from Dataset import VideoDataset
@@ -15,11 +18,11 @@ MODEL_PERFORMANCE = 'stats.json'
 
 
 print('Datasets')
-training_dataset = VideoDataset('train.json')
+training_dataset = VideoDataset('test.json')
 test_dataset = VideoDataset('test.json')
 
-training_batch_size = 4
-test_batch_size = 4
+training_batch_size = 2
+test_batch_size = 2
 
 training_loader = torch.utils.data.DataLoader(training_dataset, batch_size=training_batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=True)
@@ -46,7 +49,7 @@ else:
     test_counter = []
     test_confusion_matrix = []
 
-net = NeuralNet(len(Dataset.TYPES_NAMES_TO_NUMBERS.keys()))
+net = NeuralNet(keywords=['1goal', '2chance', '3special'])
 print('Model')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,16 +62,18 @@ if len(test_accuracy) != 0:
 
 loss_function = nn.CrossEntropyLoss()
 
-learning_rate = 0.01
+learning_rate = 0.1
 momentum = .9
 
 optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=momentum)
+scheduler = StepLR(optimizer, step_size=15, gamma=0.5)
 
 random_seed = 1
 torch.manual_seed(random_seed)
 
 
 def train(epoch):
+    net.train()
     conf_mtx = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
     correct_guesses = 0
     for batch_idx, (images, labels) in enumerate(training_loader):
@@ -95,6 +100,8 @@ def train(epoch):
             train_losses.append(loss.item())
             train_counter.append((batch_idx * training_batch_size) + ((epoch - 1) * len(training_dataset)))
 
+        torch.cuda.empty_cache()
+
     current_accuracy = float(correct_guesses) / float(len(training_dataset))
     train_accuracy.append(current_accuracy)
     train_confusion_matrix.append(conf_mtx)
@@ -112,6 +119,7 @@ def change_conf_mtx(mtx, labels, ouput):
 
 
 def test():
+    net.eval()
     conf_mtx = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
     test_loss = 0
     correct_guesses = 0
@@ -127,6 +135,8 @@ def test():
 
             correct_guesses += torch.eq(guesses, labels.data.view_as(guesses)).sum()
             conf_mtx = change_conf_mtx(conf_mtx, labels, output)
+
+            torch.cuda.empty_cache()
 
         test_loss /= len(test_dataset) / test_batch_size
         test_losses.append(test_loss)
@@ -145,9 +155,9 @@ print("\nTraining began")
 epoch = len(test_accuracy)
 while epoch <= 100:
     train(epoch)
-    test()
+    #test()
 
-    test_counter.append(epoch * training_dataset.num_clips)
+    #test_counter.append(epoch * training_dataset.num_clips)
 
     if epoch % 5 == 0:
         myutils.save_data(
